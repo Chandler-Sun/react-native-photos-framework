@@ -1,7 +1,9 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <React/RCTBridge.h>
 
-@interface ImageResizer : NSObject
+@interface ImageResizer : NSObject <RCTBridgeModule>
+
 +(void) createResizedImage:(UIImage *)image
                      width:(float)width
                     height:(float)height

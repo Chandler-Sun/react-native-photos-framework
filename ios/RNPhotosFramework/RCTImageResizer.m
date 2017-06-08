@@ -4,6 +4,9 @@
 
 @implementation ImageResizer
 
+@synthesize bridge = _bridge;
+
+RCT_EXPORT_MODULE();
 
 bool saveImage(NSString * fullPath, UIImage * image, NSString * format, float quality)
 {
@@ -25,7 +28,7 @@ bool saveImage(NSString * fullPath, UIImage * image, NSString * format, float qu
 NSString * generateFilePath(NSString * ext, NSString *name, NSString * outputPath)
 {
     NSString* directory;
-
+    
     if ([outputPath length] == 0) {
         NSArray* paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
         directory = [paths firstObject];
@@ -38,13 +41,13 @@ NSString * generateFilePath(NSString * ext, NSString *name, NSString * outputPat
     name = [[name lastPathComponent] stringByDeletingPathExtension];
     NSString* fullName = [NSString stringWithFormat:@"%@.%@", name, ext];
     NSString* fullPath = [directory stringByAppendingPathComponent:fullName];
-
+    
     return fullPath;
 }
 
 UIImage * rotateImage(UIImage *inputImage, float rotationDegrees)
 {
-
+    
     // We want only fixed 0, 90, 180, 270 degree rotations.
     const int rotDiv90 = (int)round(rotationDegrees / 90);
     const int rotQuadrant = rotDiv90 % 4;
@@ -70,48 +73,101 @@ UIImage * rotateImage(UIImage *inputImage, float rotationDegrees)
         }
         
         return [[UIImage alloc] initWithCGImage: inputImage.CGImage
-                                                  scale: 1.0
-                                                  orientation: orientation];
+                                          scale: 1.0
+                                    orientation: orientation];
     }
 }
 
 +(void) createResizedImage:(UIImage *)image
+                     width:(float)width
+                    height:(float)height
+                    format:(NSString *)format
+                   quality:(float)quality
+                  rotation:(float)rotation
+                outputPath:(NSString *)outputPath
+                  fileName:(NSString *)fileName
+          andCompleteBLock:(void(^)(NSString *error, NSString *path))completeBlock
+
+{
+    CGSize newSize = CGSizeMake(width, height);
+    NSString* fullPath = generateFilePath(@"jpg", fileName, outputPath);
+    
+    // Rotate image if rotation is specified.
+    if (0 != (int)rotation) {
+        image = rotateImage(image, rotation);
+        if (image == nil) {
+            completeBlock(@"Can't rotate the image.", @"");
+            return;
+        }
+    }
+    
+    // Do the resizing
+    UIImage * scaledImage = [image scaleToSize:newSize];
+    if (scaledImage == nil) {
+        completeBlock(@"Can't resize the image.", @"");
+        return;
+    }
+    
+    // Compress and save the image
+    if (!saveImage(fullPath, scaledImage, format, quality)) {
+        completeBlock(@"Can't save the image. Check your compression format.", @"");
+        return;
+    }
+    
+    completeBlock(nil, fullPath);
+}
+
+RCT_EXPORT_METHOD(createResizedImage:(NSString *)path
                   width:(float)width
                   height:(float)height
                   format:(NSString *)format
                   quality:(float)quality
                   rotation:(float)rotation
                   outputPath:(NSString *)outputPath
-                  fileName:(NSString *)fileName
-                  andCompleteBLock:(void(^)(NSString *error, NSString *path))completeBlock
-
+                  callback:(RCTResponseSenderBlock)callback)
 {
     CGSize newSize = CGSizeMake(width, height);
-    NSString* fullPath = generateFilePath(@"jpg", fileName, outputPath);
-
+    NSString* fullPath = generateFilePath(@"jpg",nil, outputPath);
+    
+    [_bridge.imageLoader loadImageWithURLRequest:[RCTConvert NSURLRequest:path] callback:^(NSError *error, UIImage *image) {
+        if (error || image == nil) {
+            if ([path hasPrefix:@"data:"] || [path hasPrefix:@"file:"]) {
+                NSURL *imageUrl = [[NSURL alloc] initWithString:path];
+                image = [UIImage imageWithData:[NSData dataWithContentsOfURL:imageUrl]];
+            } else {
+                image = [[UIImage alloc] initWithContentsOfFile:path];
+            }
+            if (image == nil) {
+                callback(@[@"Can't retrieve the file from the path.", @""]);
+                return;
+            }
+        }
+        
         // Rotate image if rotation is specified.
         if (0 != (int)rotation) {
             image = rotateImage(image, rotation);
             if (image == nil) {
-                completeBlock(@"Can't rotate the image.", @"");
+                callback(@[@"Can't rotate the image.", @""]);
                 return;
             }
         }
-
+        
         // Do the resizing
         UIImage * scaledImage = [image scaleToSize:newSize];
         if (scaledImage == nil) {
-            completeBlock(@"Can't resize the image.", @"");
-            return;
-        }
-
-        // Compress and save the image
-        if (!saveImage(fullPath, scaledImage, format, quality)) {
-            completeBlock(@"Can't save the image. Check your compression format.", @"");
+            callback(@[@"Can't resize the image.", @""]);
             return;
         }
         
-        completeBlock(nil, fullPath);
+        // Compress and save the image
+        if (!saveImage(fullPath, scaledImage, format, quality)) {
+            callback(@[@"Can't save the image. Check your compression format.", @""]);
+            return;
+        }
+        
+        callback(@[[NSNull null], fullPath]);
+    }];
 }
+
 
 @end
