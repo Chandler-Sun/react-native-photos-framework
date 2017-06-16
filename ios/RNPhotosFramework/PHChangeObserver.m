@@ -1,6 +1,5 @@
 #import "PHChangeObserver.h"
 #import <React/RCTBridge.h>
-#import <React/RCTBridge+Private.h>
 #import <React/RCTEventDispatcher.h>
 #import "PHCachedFetchResult.h"
 #import "PHCollectionService.h"
