@@ -233,7 +233,7 @@ RCT_EXPORT_MODULE()
                                                                        options:imageOptions
                                                                  resultHandler:^(UIImage *result, NSDictionary<NSString *, id> *info) {
                                                                      if (result) {
-                                                                         if(deliveryMode == PHImageRequestOptionsDeliveryModeOpportunistic && [info[@"PHImageResultIsDegradedKey"] boolValue] == YES) {
+                                                                         if(imageOptions.deliveryMode == PHImageRequestOptionsDeliveryModeOpportunistic && [info[@"PHImageResultIsDegradedKey"] boolValue] == YES) {
                                                                              if (partialLoadHandler) {
                                                                                  partialLoadHandler(result);
                                                                              }
